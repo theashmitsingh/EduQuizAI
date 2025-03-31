@@ -26,7 +26,7 @@ exports.uploadPDF = async (req, res) => {
     }
 
     try {
-      const prompt = `Generate a quiz with 5 multiple-choice questions in JSON format. 
+      const prompt = `Generate a quiz with 21 multiple-choice questions in JSON format. 
       Each question must have:
       - A "question" field with the question text.
       - An "options" field (array) with 4 answer choices.
@@ -98,7 +98,7 @@ exports.generateQuiz = async (req, res) => {
       // console.log("MISTRAL_URL:", MISTRAL_URL);
       // console.log("MISTRAL_API_KEY:", MISTRAL_API_KEY);
 
-      const prompt = `Generate a quiz with 5 multiple-choice questions in JSON format. 
+      const prompt = `Generate a quiz with 21 multiple-choice questions in JSON format. 
       Each question must have:
       - A "question" field with the question text.
       - An "options" field (array) with 4 answer choices.
@@ -161,7 +161,7 @@ exports.generateQuiz = async (req, res) => {
 };
 
 exports.generateQuizFromContent = async (content) => {
-  const prompt = `Generate a quiz with 5 multiple-choice questions in JSON format based on this content: ${content}`;
+  const prompt = `Generate a quiz with 21 multiple-choice questions in JSON format based on this content: ${content}`;
 
   const response = await axios.post(
     MISTRAL_URL,

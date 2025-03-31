@@ -3,10 +3,14 @@ import toast from "react-hot-toast";
 import { AppContext } from "../context/AppContext";
 import axios from "axios";
 import { useLocation } from "react-router-dom";
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 const GenerateQuiz = () => {
   const [questions, setQuestions] = useState([]);
   const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [markedForReview, setMarkedForReview] = useState({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(null);
   const [showAnswers, setShowAnswers] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -21,9 +25,8 @@ const GenerateQuiz = () => {
         toast.error("No topic provided!");
         setLoading(false);
         return;
-      }
+    }
     axios.defaults.withCredentials = true;
-    console.log("Backend URL: ", backendUrl);
     const fetchQuiz = async () => {
         try {
           const response = await axios.post(
@@ -31,13 +34,11 @@ const GenerateQuiz = () => {
             { content: topic },
             { headers: { "Content-Type": "application/json" } }
           );
-      
-          console.log("✅ Received Quiz Data:", response.data);
-      
+
           if (!response.data.quiz || response.data.quiz.length === 0) {
             throw new Error("No quiz data received.");
           }
-      
+
           setQuestions(response.data.quiz);
         } catch (error) {
           console.error("❌ Error fetching quiz:", error);
@@ -45,25 +46,47 @@ const GenerateQuiz = () => {
         } finally {
           setLoading(false);
         }
-      };
-      
-  
+    };
     fetchQuiz();
   }, []);
   
-
-  const handleOptionChange = (questionIndex, option) => {
-    setSelectedAnswers({ ...selectedAnswers, [questionIndex]: option });
+  const handleOptionChange = (option) => {
+    setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: option }));
   };
 
-  const calculateScore = () => {
+  const handleClearSelection = () => {
+    setSelectedAnswers(prev => {
+      const newAnswers = { ...prev };
+      delete newAnswers[currentQuestionIndex];
+      return newAnswers;
+    });
+  };
+
+  const handleMarkForReview = () => {
+    if (!showAnswers) {
+      setMarkedForReview({ ...markedForReview, [currentQuestionIndex]: true });
+    }
+  };
+
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    }
+  };
+
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+    }
+  };
+
+  const handleSubmitQuiz = () => {
     let newScore = 0;
     questions.forEach((q, index) => {
       if (selectedAnswers[index] === q.answer) {
         newScore++;
       }
     });
-
     setScore(newScore);
     setShowAnswers(true);
   };
@@ -77,56 +100,71 @@ const GenerateQuiz = () => {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
-      <h1 className="text-2xl font-bold mb-4">Your Quiz</h1>
-      
-      <form className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg">
-        {questions.map((q, index) => (
-          <div key={index} className="mb-6">
-            <p className="font-semibold">{index + 1}. {q.question}</p>
+    <>
+      <Navbar />
+      <div className="flex min-h-screen bg-gray-100 p-4 gap-4 mt-18">
+        <div className="w-1/4 h-96 bg-white p-4 rounded-lg shadow-lg flex flex-col justify-between">
+          <div>
+            <h2 className="text-lg font-semibold mb-3 text-green-500">Attempted Questions</h2>
+            <div className="flex flex-wrap gap-2">
+              {questions.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-8 h-8 flex items-center justify-center rounded-full shadow-lg text-black border font-semibold cursor-pointer 
+                    ${selectedAnswers[index] ? "bg-green-500" : markedForReview[index] ? "bg-blue-500" : "bg-white border-zinc-600"} 
+                    ${showAnswers && !selectedAnswers[index] ? "bg-red-500" : ""}`}
+                >
+                  {index + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 text-sm">
+            <p>Marked for Review: {Object.keys(markedForReview).length}</p>
+            {showAnswers && (
+              <p className="mt-2">Correct: {score} | Incorrect: {questions.length - score}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="w-3/4 bg-white p-6 rounded-lg shadow-lg max-h-[70vh] flex flex-col justify-between">
+          <div>
+            <p className="font-semibold">{currentQuestionIndex + 1}. {questions[currentQuestionIndex].question}</p>
             <div className="mt-2 space-y-2">
-              {q.options.map((option, i) => (
-                <label key={i} className="flex items-center space-x-2 cursor-pointer">
+              {questions[currentQuestionIndex].options.map((option, i) => (
+                <label key={i} className="flex items-center space-x-2 cursor-pointer w-full">
                   <input
-                    type="radio"
-                    name={`q${index}`}
-                    value={option}
-                    checked={selectedAnswers[index] === option}
-                    onChange={() => handleOptionChange(index, option)}
-                    className="hidden peer"
+                    type="checkbox"
+                    checked={selectedAnswers[currentQuestionIndex] === option}
+                    onChange={() => handleOptionChange(option)}
+                    className="cursor-pointer"
+                    disabled={showAnswers}
                   />
-                  <span
-                    className={`p-2 w-full text-center rounded-md transition ${
-                      selectedAnswers[index] === option ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300"
-                    }`}
-                  >
-                    {option}
+                  <span className="cursor-pointer" onClick={() => handleOptionChange(option)}>
+                    {String.fromCharCode(97 + i)}) {option}
                   </span>
                 </label>
               ))}
             </div>
-
             {showAnswers && (
-              <p className="mt-2 text-green-600 font-semibold">Correct Answer: {q.answer}</p>
+              <p className="mt-2 font-semibold text-green-600">Answer: {questions[currentQuestionIndex].answer}</p>
             )}
           </div>
-        ))}
-
-        <button
-          type="button"
-          onClick={calculateScore}
-          className="mt-4 w-full py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition"
-        >
-          Submit Quiz
-        </button>
-      </form>
-
-      {score !== null && (
-        <h2 className="text-lg font-semibold mt-4">
-          Your Score: {score} / {questions.length}
-        </h2>
-      )}
-    </div>
+          <div className="flex flex-col gap-2 w-full mt-4">
+            <div className="flex justify-between w-full gap-2">
+              <button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} className="py-2 px-4 bg-gray-500 w-full cursor-pointer text-white rounded-md">Previous</button>
+              <button onClick={handleClearSelection} className="py-2 w-full cursor-pointer px-4 bg-yellow-500 text-white rounded-md">Clear Selection</button>
+              <button onClick={handleNextQuestion} disabled={currentQuestionIndex === questions.length - 1} className="py-2 w-full cursor-pointer px-4 bg-green-500 text-white rounded-md">Save and Next</button>
+            </div>
+            <div className="flex flex-row gap-2">
+            <button onClick={handleMarkForReview} disabled={showAnswers} className="py-2 shadow-lg cursor-pointer px-4 bg-blue-500 text-white rounded-md w-full">Mark for Review</button>
+            <button onClick={handleSubmitQuiz} disabled={showAnswers} className="py-2 shadow-lg cursor-pointer px-4 bg-red-500 text-white rounded-md w-full">Submit</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <Footer />
+    </>
   );
 };
 
