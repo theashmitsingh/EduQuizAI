@@ -1,6 +1,7 @@
 const axios = require("axios");
 const fs = require("fs");
 const pdfParse = require("pdf-parse");
+const quizModel = require("../models/quizModel");
 
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
 const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
@@ -87,6 +88,7 @@ exports.uploadPDF = async (req, res) => {
 
 exports.generateQuiz = async (req, res) => {
   const content = req.body.content;
+  const userId = req.user.id;
   if (!content) {
       return res.status(400).json({
           success: false,
@@ -145,6 +147,15 @@ exports.generateQuiz = async (req, res) => {
           });
       }
 
+      const newQuiz = new quizModel({
+        title: `Quiz on ${content}`,
+        content,
+        questions: quizJSON,
+        createdBy: userId,
+      });
+
+      await newQuiz.save();
+      
       return res.status(200).json({
           success: true,
           message: "Quiz generated successfully",
