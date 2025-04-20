@@ -9,6 +9,10 @@ const Quiz = () => {
   const { userData } = useContext(AppContext);
   const navigate = useNavigate();
 
+  const handlePreviousQuiz = (quizId) => {
+    navigate(`/previous-quiz/${quizId}`);
+  };
+
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -31,7 +35,7 @@ const Quiz = () => {
         <div className="mb-4 flex items-center space-x-3 p-3 bg-gray-100 rounded-lg">
           <FaUserCircle className="text-4xl text-gray-500" />
           <div>
-            <h2 className="text-lg font-semibold">{userData ? userData.name : 'User'}</h2>
+            <h2 className="text-lg font-semibold">{userData?.name || "User"}</h2>
             <p className="text-xs text-gray-500">Pro Trial</p>
           </div>
         </div>
@@ -47,27 +51,37 @@ const Quiz = () => {
           />
           <button 
             onClick={handleGenerateClick} 
-            className={`w-full py-2 mt-2 rounded-lg cursor-pointer ${
+            className={`w-full py-2 mt-2 rounded-lg ${
               prompt.trim() ? "bg-blue-500 text-white" : "bg-gray-300 text-gray-800 cursor-not-allowed"
             }`}
             disabled={!prompt.trim()}
           >
             Generate
           </button>
-          <p className="font-semibold mt-2">Previous Quizzes</p>
-          <ul className="mt-5">
-            <li className="p-2 bg-zinc-200 rounded-md mb-2 cursor-pointer">Quiz 1</li>
-            <li className="p-2 bg-zinc-200 rounded-md mb-2 cursor-pointer">Quiz 2</li>
-            <li className="p-2 bg-zinc-200 rounded-md cursor-pointer">Quiz 3</li>
+          <p className="font-semibold mt-4 mb-2">Previous Quizzes</p>
+          <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
+            {userData?.userQuiz?.length > 0 ? (
+              userData.userQuiz.map((item, index) => (
+                <li
+                  key={item || index}
+                  className="p-2 bg-zinc-200 rounded-md cursor-pointer hover:bg-zinc-300 transition"
+                  onClick={() => handlePreviousQuiz(item)}
+                >
+                  {item.title || `Quiz ${index + 1}`}
+                </li>
+              ))
+            ) : (
+              <p className="text-sm text-gray-500">No quizzes found.</p>
+            )}
           </ul>
         </div>
 
         {/* Settings and Help Buttons */}
         <div className="mt-auto space-y-2">
-          <button className="w-full flex items-center gap-2 p-2 bg-gray-100 rounded-md cursor-pointer hover:bg-gray-200">
+          <button className="w-full flex items-center gap-2 p-2 bg-gray-100 rounded-md hover:bg-gray-200">
             <FaCog /> Settings
           </button>
-          <button className="w-full flex items-center gap-2 p-2 bg-gray-100 rounded-md cursor-pointer hover:bg-gray-200">
+          <button className="w-full flex items-center gap-2 p-2 bg-gray-100 rounded-md hover:bg-gray-200">
             <FaQuestionCircle /> Help
           </button>
         </div>

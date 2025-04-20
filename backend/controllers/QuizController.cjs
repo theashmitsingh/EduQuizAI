@@ -1,7 +1,10 @@
 const axios = require("axios");
 const fs = require("fs");
 const pdfParse = require("pdf-parse");
-const quizModel = require("../models/quizModel").default;
+const { default: userModel } = require("../models/userModel");
+const { default: quizModel } = require("../models/quizModel");
+const previousSubmission = require("../models/previousSubmission").default;
+const { default: mongoose } = require("mongoose");
 const submissionModel = require("../models/submissionModel").default;
 
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
@@ -85,10 +88,9 @@ exports.uploadPDF = async (req, res) => {
 
 exports.generateQuiz = async (req, res) => {
   const content = req.body.content;
-  console.log("Received content/topic:", content);
   const userId = req.body.userId;
+
   if (!content) {
-    console.log("No quiz found for topic:", content);
     return res.status(400).json({
       success: false,
       message: "Content is required",
@@ -125,7 +127,6 @@ exports.generateQuiz = async (req, res) => {
     }
 
     const quizText = response.data.choices[0].message.content.trim();
-    console.log("Quiz data:", quizText);
     let quizJSON;
     try {
       quizJSON = JSON.parse(quizText);
@@ -152,11 +153,22 @@ exports.generateQuiz = async (req, res) => {
 
     await newQuiz.save();
 
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.quizes.push(newQuiz._id);
+    await user.save();
+
     return res.status(200).json({
       success: true,
       message: "Quiz generated successfully",
       quiz: quizJSON,
-      quizId: newQuiz._id
+      quizId: newQuiz._id,
     });
   } catch (error) {
     console.error("Error generating quiz:", error);
@@ -200,28 +212,23 @@ exports.generateQuizFromContent = async (content, userId) => {
 
 exports.submitQuiz = async (req, res) => {
   try {
-    console.log("Received request body:", req.body);
     const { quizId, answers, score } = req.body;
     const userId = req.body.userId;
 
     const quiz = await quizModel.findById(quizId);
-    console.log("Quiz: ", quiz);
-    console.log("Quiz ID: ", quizId);
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
 
     const submissionData = answers.map((answer) => {
       const original = quiz.questions.find(
         (q) => q.question === answer.question
       );
-      const correct = original?.answers || [];
-      const isCorrect =
-        JSON.stringify(answer.selectedOptions.sort()) ===
-        JSON.stringify(correct.sort());
+      const correct = original?.answer || "";
+      const isCorrect = answer.selectedOptions.includes(correct);
 
       return {
         question: answer.question,
         selectedOptions: answer.selectedOptions,
-        correctAnswers: correct,
+        correctAnswers: [correct],
         isCorrect,
       };
     });
@@ -240,5 +247,56 @@ exports.submitQuiz = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to submit quiz" });
+  }
+};
+
+exports.previousQuiz = async (req, res) => {
+  try {
+    const { quizId, userId } = req.body;
+
+    if (!quizId || !userId) {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: "quizId and userId are required",
+      });
+    }
+
+    console.log("userId:", userId);
+    console.log("quizId:", quizId);
+
+    const accessPreviousQuiz = await previousSubmission.findOne({
+      user: new mongoose.Types.ObjectId(userId),
+      quiz: new mongoose.Types.ObjectId(quizId),
+    });
+
+    console.log("User ID Type:", typeof userId, userId);
+    console.log("Quiz ID Type:", typeof quizId, quizId);
+    console.log("ObjectId(userId):", new mongoose.Types.ObjectId(userId));
+    console.log("ObjectId(quizId):", new mongoose.Types.ObjectId(quizId));
+
+    console.log("Access Previous Quiz Submission: ", accessPreviousQuiz);
+
+    if (!accessPreviousQuiz) {
+      return res.status(400).json({
+        success: false,
+        error: true,
+        message: "No previous quiz submission found for this user and quiz",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      error: false,
+      message: "Previous quiz fetched successfully",
+      data: accessPreviousQuiz,
+    });
+  } catch (error) {
+    console.log("Something went wrong at previous quiz controller: ", error);
+    return res.status(500).json({
+      success: false,
+      error: true,
+      message: "Internal Server Error",
+    });
   }
 };

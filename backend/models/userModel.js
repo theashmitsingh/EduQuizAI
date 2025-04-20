@@ -9,6 +9,11 @@ const userSchema = new mongoose.Schema({
     isAccountVerified: { type: Boolean, default: false },
     resetOtp: { type: String, default: '' },
     resetOtpExpireAt: { type: Number, default: 0 },
+    quizes: [
+        {
+            type: mongoose.Schema.Types.ObjectId, ref: "Quiz"
+        }
+    ]
 });
 
 const userModel = mongoose.models.User || mongoose.model('User', userSchema);

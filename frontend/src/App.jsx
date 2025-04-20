@@ -14,6 +14,7 @@ import Quiz from './pages/Quiz';
 import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
 import GenerateQuiz from './pages/GenerateQuiz';
+import PreviousQuiz from './components/PreviousQuiz';
 
 const App = () => {
   return (
@@ -30,6 +31,7 @@ const App = () => {
         <Route path='/quiz' element={<Quiz />} />
         <Route path='/profile' element={<Profile />} />
         <Route path='/generate-quiz' element={<GenerateQuiz />} />
+        <Route path="/previous-quiz/:quizId" element={<PreviousQuiz key={window.location.pathname} />} />
         <Route path='*' element={<NotFound />} />
       </Routes>
     </div>
