@@ -3,8 +3,8 @@ const fs = require("fs");
 const pdfParse = require("pdf-parse");
 const { default: userModel } = require("../models/userModel");
 const { default: quizModel } = require("../models/quizModel");
+const { default: PreviousQuiz } = require("../models/previousSubmission.js");
 const previousSubmission = require("../models/previousSubmission").default;
-const { default: mongoose } = require("mongoose");
 const submissionModel = require("../models/submissionModel").default;
 
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
@@ -216,7 +216,10 @@ exports.submitQuiz = async (req, res) => {
     const userId = req.body.userId;
 
     const quiz = await quizModel.findById(quizId);
-    if (!quiz) return res.status(404).json({ message: "Quiz not found" });
+    if (!quiz) {
+      console.log(`Quiz not found with quizId: ${quizId}`);
+      return res.status(404).json({ message: "Quiz not found" });
+    }
 
     const submissionData = answers.map((answer) => {
       const original = quiz.questions.find(
@@ -265,15 +268,10 @@ exports.previousQuiz = async (req, res) => {
     console.log("userId:", userId);
     console.log("quizId:", quizId);
 
-    const accessPreviousQuiz = await previousSubmission.findOne({
-      user: new mongoose.Types.ObjectId(userId),
-      quiz: new mongoose.Types.ObjectId(quizId),
+    const accessPreviousQuiz = await submissionModel.findOne({
+      user: userId,
+      quiz: quizId,
     });
-
-    console.log("User ID Type:", typeof userId, userId);
-    console.log("Quiz ID Type:", typeof quizId, quizId);
-    console.log("ObjectId(userId):", new mongoose.Types.ObjectId(userId));
-    console.log("ObjectId(quizId):", new mongoose.Types.ObjectId(quizId));
 
     console.log("Access Previous Quiz Submission: ", accessPreviousQuiz);
 

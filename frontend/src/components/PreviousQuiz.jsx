@@ -10,38 +10,33 @@ const PreviousQuiz = () => {
   const { quizId } = useParams();
   const { userData, backendUrl } = useContext(AppContext);
   const [quizDetails, setQuizDetails] = useState(null);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   useEffect(() => {
-    if (!quizId) return;
-
-    console.log("Quiz ID: ", quizId);
+    if (!quizId || !userData) return;
 
     const fetchQuizDetails = async () => {
       try {
+        console.log("User ID: ", userData.userId);
+        console.log("Quiz ID: ", quizId);
         const response = await axios.post(
           `${backendUrl}/api/quiz/previous-quiz`,
-          { id: quizId },
+          { userId: userData.userId, quizId },
           { headers: { "Content-Type": "application/json" }, withCredentials: true }
         );
-
-        console.log("Response: ", response);
-
         if (response.data) {
-          console.log("Response Data: ", response.data);
           setQuizDetails(response.data);
-          console.log("Response data: ", response.data.data);
         } else {
           toast.error("Quiz not found or is empty!");
         }
       } catch (error) {
         toast.error("Failed to fetch previous quiz.");
-        console.error(error);
+        console.error("Error response:", error.response);
+        console.error("Error details:", error);
       }
     };
 
     fetchQuizDetails();
-  }, [quizId]);
+  }, [quizId, userData]);
 
   if (!quizDetails) {
     return (
@@ -63,26 +58,23 @@ const PreviousQuiz = () => {
         </h2>
 
         <div className="space-y-8">
-          {quizDetails?.data?.questions?.map((q, index) => (
+          {quizDetails?.data?.answers?.map((answer, index) => (
             <div
               key={index}
               className="bg-white p-6 rounded-lg shadow-md space-y-4"
             >
               <h3 className="font-semibold text-lg">
-                {index + 1}. {q.question}
+                {index + 1}. {answer.question}
               </h3>
               <ul className="space-y-2">
-                {q.options?.map((option, i) => {
-                  const isSelected = q.selectedOptions?.includes(option);
-                  const isCorrect = q.correctAnswers?.includes(option);
+                {answer.selectedOptions?.map((option, i) => {
+                  const isCorrect = answer.correctAnswers?.includes(i.toString()); // Fix the comparison logic here
                   return (
                     <li
                       key={i}
                       className={`px-4 py-2 rounded-md border ${isCorrect
                         ? "bg-green-100 border-green-500"
-                        : isSelected
-                          ? "bg-red-100 border-red-400"
-                          : "bg-gray-100"
+                        : "bg-red-100 border-red-400"
                         }`}
                     >
                       {String.fromCharCode(97 + i)}) {option}
@@ -91,18 +83,18 @@ const PreviousQuiz = () => {
                 })}
               </ul>
               <p className="text-green-600 font-semibold">
-                Correct Answer: {q.correctAnswers?.length ? q.correctAnswers.join(", ") : "Not Available"}
+                Correct Answer: {answer.correctAnswers?.length ? answer.correctAnswers.join(", ") : "Not Available"}
               </p>
 
-              <p className={`font-semibold ${q.isCorrect ? "text-green-600" : "text-red-600"}`}>
-                You answered this {q.isCorrect ? "correctly" : "incorrectly"}.
+              <p className={`font-semibold ${answer.isCorrect ? "text-green-600" : "text-red-600"}`}>
+                You answered this {answer.isCorrect ? "correctly" : "incorrectly"}.
               </p>
             </div>
           ))}
         </div>
 
         <div className="mt-8 text-center text-xl font-semibold">
-          Total Score: {quizDetails?.data?.score || 0} / {quizDetails?.data?.questions?.length || 0}
+          Total Score: {quizDetails?.data?.score || 0} / {quizDetails?.data?.answers?.length || 0}
         </div>
       </div>
       <Footer />

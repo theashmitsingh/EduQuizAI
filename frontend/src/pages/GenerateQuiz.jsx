@@ -39,6 +39,8 @@ const GenerateQuiz = () => {
           { content: topic },
           { headers: { "Content-Type": "application/json" } }
         );
+
+        console.log("Sending to backend:", { content: topic });
   
         console.log("Full Response:", response);
         const questionsArray = response.data.quiz;

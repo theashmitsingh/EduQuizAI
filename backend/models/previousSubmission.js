@@ -3,13 +3,11 @@ import mongoose from "mongoose";
 const previousSchema = new mongoose.Schema(
   {
     user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      type: String,  // Keep as String (no ref)
       required: true,
     },
     quiz: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Quiz",
+      type: String,  // Keep as String (no ref)
       required: true,
     },
     answers: [
