@@ -12,77 +12,105 @@ const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
 
 exports.uploadPDF = async (req, res) => {
   try {
+    console.log("Body:", req.body);
+    console.log("File:", req.file);
+    const userId = req.body.userId;
+    console.log("userId: ", userId);
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: "No File Uploaded",
+        error: true,
+        message: "No PDF file uploaded",
       });
     }
 
     const dataBuffer = fs.readFileSync(req.file.path);
     const pdfData = await pdfParse(dataBuffer);
     const content = pdfData.text;
-    if (!content) {
+
+    if (!content || content.trim() === "") {
       return res.status(400).json({
         success: false,
-        message: "Please enter content",
+        error: true,
+        message: "PDF content is empty or unreadable",
       });
     }
+
+    const prompt = `Generate a quiz with 10 multiple-choice questions in JSON format based on the following content.
+Each question must have:
+- A "question" field.
+- An "options" array with 4 choices.
+- An "answer" field with the correct option.
+
+Return ONLY a JSON array. Do NOT include any explanation or text.
+
+Content: ${content}`;
+
+    const response = await axios.post(
+      MISTRAL_URL,
+      {
+        model: "mistral-tiny",
+        messages: [{ role: "user", content: prompt }],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${MISTRAL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const quizText = response.data.choices[0].message.content.trim();
+    let quizJSON;
 
     try {
-      const prompt = `Generate a quiz with 21 multiple-choice questions in JSON format. 
-      Each question must have:
-      - A "question" field with the question text.
-      - An "options" field (array) with 4 answer choices.
-      - An "answer" field with the correct option.
-      
-      Return ONLY a JSON array. Do NOT include any explanation, text, or markdown formatting.
-      
-      Content: ${content}`;
-
-      const response = await axios.post(
-        MISTRAL_URL,
-        {
-          model: "mistral-tiny",
-          messages: [{ role: "user", content: prompt }],
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${MISTRAL_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const quizText = response.data.choices[0].message.content.trim();
-      let quizJSON;
-
-      try {
-        quizJSON = JSON.parse(quizText);
-        if (
-          !Array.isArray(quizJSON) ||
-          !quizJSON.every((q) => q.question && q.options && q.answer)
-        ) {
-          throw new Error("Invalid quiz format");
-        }
-      } catch (error) {
-        console.error("Invalid JSON from API:", quizText);
-        return res.status(400).json({
-          success: false,
-          message: "Quiz generation failed. Try again",
-        });
+      quizJSON = JSON.parse(quizText);
+      if (
+        !Array.isArray(quizJSON) ||
+        !quizJSON.every((q) => q.question && q.options && q.answer)
+      ) {
+        throw new Error("Invalid quiz format");
       }
     } catch (error) {
-      console.log("Error processing upload pdf file: ", error);
-      return res.status(500).json({
+      console.error("Invalid JSON from API:", quizText);
+      return res.status(400).json({
         success: false,
-        message: "Internal Server Error",
+        error: true,
+        message: "Quiz generation failed due to invalid format",
       });
     }
-    fs.unlinkSync(req.file.path);
+    const newQuiz = new quizModel({
+      title: `Quiz on ${content}`,
+      content,
+      questions: quizJSON,
+      createdBy: userId,
+    });
+    await newQuiz.save();
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    user.quizes.push(newQuiz._id);
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message: "Quiz generated successfully",
+      quiz: quizJSON,
+      quizId: newQuiz._id,
+    });
   } catch (error) {
-    console.error("Error processing upload:", error.message);
-    res.status(500).json({ error: "Error processing upload." });
+    console.error("Error in uploadPDF:", error);
+    return res.status(500).json({
+      success: false,
+      error: true,
+      message: "Internal Server Error",
+    });
   }
 };
 
@@ -143,7 +171,7 @@ exports.generateQuiz = async (req, res) => {
         message: "Error parsing quiz JSON",
       });
     }
-
+    console.log(quizJSON);
     const newQuiz = new quizModel({
       title: `Quiz on ${content}`,
       content,

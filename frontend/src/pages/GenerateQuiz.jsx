@@ -26,53 +26,58 @@ const GenerateQuiz = () => {
       setLoading(false);
       return;
     }
-  
+
     axios.defaults.withCredentials = true;
-  
+
     const fetchQuiz = async () => {
       try {
-        console.log("Backend URL:", backendUrl);
-        console.log("Topic:", topic);
-  
         const response = await axios.post(
           `${backendUrl}/api/quiz/generate-quiz`,
           { content: topic },
           { headers: { "Content-Type": "application/json" } }
         );
-
-        console.log("Sending to backend:", { content: topic });
-  
-        console.log("Full Response:", response);
         const questionsArray = response.data.quiz;
-        console.log("Quiz:", questionsArray);
-        console.log("Quiz ID:", response.data.quizId);
-  
         if (!Array.isArray(questionsArray) || questionsArray.length === 0) {
-          console.warn("⚠️ Invalid or empty quiz array:", questionsArray);
           toast.error("Quiz has no questions.");
           return;
         }
-  
         setQuestions(questionsArray.map(q => ({ ...q, quizId: response.data.quizId || "unknown" })));
       } catch (error) {
         console.error("❌ Error fetching quiz:", error);
-        if (error.response) {
-          toast.error(error.response?.data?.message || "Failed to load quiz. Try again!");
-        } else if (error.request) {
-          toast.error("No response from the server. Please try again later.");
-        } else {
-          toast.error("An unexpected error occurred.");
-        }
+        toast.error(error.response?.data?.message || "Failed to load quiz.");
       } finally {
         setLoading(false);
       }
     };
-  
-    fetchQuiz();
-  }, [topic]);
-  
-  
-  
+
+    const fetchQuizFromPDF = async () => {
+      try {
+        const response = await axios.get(
+          `${backendUrl}/api/pdf/get-quiz/${topic}`,
+          { headers: { "Content-Type": "application/json" } }
+        );
+        const questionsArray = response.data.quiz;
+        if (!Array.isArray(questionsArray) || questionsArray.length === 0) {
+          toast.error("Quiz has no questions.");
+          return;
+        }
+        setQuestions(questionsArray.map(q => ({ ...q, quizId: response.data.quizId || "unknown" })));
+      } catch (error) {
+        console.error("❌ Error fetching quiz from PDF:", error);
+        toast.error(error.response?.data?.message || "Failed to load quiz.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const isPdfQuiz = topic.startsWith("pdf_"); // 👈 if your pdf ids start with "pdf_"
+    if (isPdfQuiz) {
+      fetchQuizFromPDF();
+    } else {
+      fetchQuiz();
+    }
+  }, [topic, backendUrl]);
+
   const handleOptionChange = (option) => {
     setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: option }));
   };
@@ -105,18 +110,17 @@ const GenerateQuiz = () => {
 
   const handleSubmitQuiz = async () => {
     let newScore = 0;
-  
     const answers = questions.map((q, index) => {
       const selected = selectedAnswers[index] || [];
       const correct = Array.isArray(q.answers) ? q.answers : [q.answer];
       const selectedArray = Array.isArray(selected) ? selected : [selected];
-  
+
       const isCorrect =
         selectedArray.length === correct.length &&
         selectedArray.every((opt) => correct.includes(opt));
-  
+
       if (isCorrect) newScore++;
-  
+
       return {
         question: q.question,
         selectedOptions: selectedArray,
@@ -124,23 +128,23 @@ const GenerateQuiz = () => {
         isCorrect,
       };
     });
-  
+
     setScore(newScore);
     setShowAnswers(true);
-  
+
     try {
       const quizId = questions[0]?.quizId;
       if (!quizId) {
         toast.error("Quiz ID missing!");
         return;
       }
-  
+
       await axios.post(
         `${backendUrl}/api/quiz/submit-quiz`,
         { quizId, answers, score: newScore },
         { headers: { "Content-Type": "application/json" }, withCredentials: true }
       );
-  
+
       toast.success("Quiz submitted successfully!");
     } catch (err) {
       console.error("❌ Submit Error:", err);

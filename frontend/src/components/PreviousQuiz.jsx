@@ -18,11 +18,13 @@ const PreviousQuiz = () => {
       try {
         console.log("User ID: ", userData.userId);
         console.log("Quiz ID: ", quizId);
+        console.log("BackendUrl: ", backendUrl);
         const response = await axios.post(
           `${backendUrl}/api/quiz/previous-quiz`,
           { userId: userData.userId, quizId },
           { headers: { "Content-Type": "application/json" }, withCredentials: true }
         );
+        console.log("Response data: ", response);
         if (response.data) {
           setQuizDetails(response.data);
         } else {

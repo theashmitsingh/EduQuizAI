@@ -2,24 +2,52 @@ import React, { useContext, useState } from "react";
 import { FaCog, FaQuestionCircle, FaUserCircle } from "react-icons/fa";
 import { AppContext } from "../context/AppContext";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 const Quiz = () => {
   const [prompt, setPrompt] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
-  const { userData } = useContext(AppContext);
+  const { userData, backendUrl } = useContext(AppContext);
   const navigate = useNavigate();
 
   const handlePreviousQuiz = (quizId) => {
     navigate(`/previous-quiz/${quizId}`);
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      setSelectedFile(file.name);
-      console.log("File uploaded:", file.name);
+    if (!file) return;
+  
+    const formData = new FormData();
+    formData.append("pdfFile", file);
+    formData.append("userId", userData.userId);
+    console.log("PDF File: ", file);
+    console.log("User ID: ", userData.userId);
+  
+    try {
+      const response = await axios.post(
+        `${backendUrl}/api/quiz/upload`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          withCredentials: true,
+        }
+      );
+      console.log("Response: ", response);
+      const pdfId = response.data.quizId; // Assume backend returns some ID or topic after upload
+      console.log("PDF ID: ", pdfId);
+      if (pdfId) {
+        navigate(`/generate-quiz?topic=${pdfId}`);
+      }
+    } catch (error) {
+      console.error("❌ Error uploading PDF:", error);
+      toast.error(error.response?.data?.message || "Failed to upload PDF.");
     }
   };
+  
 
   const handleGenerateClick = () => {
     if (prompt.trim()) {
