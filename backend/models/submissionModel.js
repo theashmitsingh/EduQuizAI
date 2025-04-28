@@ -6,6 +6,7 @@ const submissionSchema = new mongoose.Schema({
     answers: [
         {
             question: { type: String, required: true },
+            options: [{ type: String, required: true }],
             selectedOptions: [{ type: String, required: true }],
             correctAnswers: [{ type: String, required: true }],
             isCorrect: { type: Boolean, required: true },

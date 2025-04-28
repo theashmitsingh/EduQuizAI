@@ -16,6 +16,10 @@ const previousSchema = new mongoose.Schema(
           type: String,
           required: true,
         },
+        options: {
+          type: [String],
+          required: true,
+        },
         selectedOptions: {
           type: [String],
           required: true,

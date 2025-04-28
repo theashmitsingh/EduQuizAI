@@ -5,11 +5,12 @@ import axios from "axios";
 import { useLocation } from "react-router-dom";
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import { FaArrowLeft, FaArrowRight, FaFlag, FaCheck, FaTimes, FaSpinner } from "react-icons/fa";
 
 const GenerateQuiz = () => {
   const [questions, setQuestions] = useState([]);
   const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [markedForReview, setMarkedForReview] = useState({});
+  const [markedForReview, setMarkedForReview] = useState(new Set());
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(null);
   const [showAnswers, setShowAnswers] = useState(false);
@@ -31,11 +32,13 @@ const GenerateQuiz = () => {
 
     const fetchQuiz = async () => {
       try {
+        console.log("Fetching quiz for topic:", topic);
         const response = await axios.post(
           `${backendUrl}/api/quiz/generate-quiz`,
           { content: topic },
           { headers: { "Content-Type": "application/json" } }
         );
+        console.log("Quiz Response:", response.data);
         const questionsArray = response.data.quiz;
         if (!Array.isArray(questionsArray) || questionsArray.length === 0) {
           toast.error("Quiz has no questions.");
@@ -52,10 +55,13 @@ const GenerateQuiz = () => {
 
     const fetchQuizFromPDF = async () => {
       try {
+        console.log("Fetching PDF quiz for ID:", topic);
         const response = await axios.get(
-          `${backendUrl}/api/pdf/get-quiz/${topic}`,
+          `${backendUrl}/api/quiz/generate-quiz`,
+          { quizId: topic }, 
           { headers: { "Content-Type": "application/json" } }
         );
+        console.log("PDF Quiz Response:", response.data);
         const questionsArray = response.data.quiz;
         if (!Array.isArray(questionsArray) || questionsArray.length === 0) {
           toast.error("Quiz has no questions.");
@@ -70,7 +76,7 @@ const GenerateQuiz = () => {
       }
     };
 
-    const isPdfQuiz = topic.startsWith("pdf_"); // 👈 if your pdf ids start with "pdf_"
+    const isPdfQuiz = topic.startsWith("pdf_");
     if (isPdfQuiz) {
       fetchQuizFromPDF();
     } else {
@@ -92,7 +98,15 @@ const GenerateQuiz = () => {
 
   const handleMarkForReview = () => {
     if (!showAnswers) {
-      setMarkedForReview({ ...markedForReview, [currentQuestionIndex]: true });
+      setMarkedForReview(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(currentQuestionIndex)) {
+          newSet.delete(currentQuestionIndex);
+        } else {
+          newSet.add(currentQuestionIndex);
+        }
+        return newSet;
+      });
     }
   };
 
@@ -112,7 +126,12 @@ const GenerateQuiz = () => {
     let newScore = 0;
     const answers = questions.map((q, index) => {
       const selected = selectedAnswers[index] || [];
-      const correct = Array.isArray(q.answers) ? q.answers : [q.answer];
+      const correct = Array.isArray(q.answers) 
+        ? q.answers 
+        : Array.isArray(q.answer) 
+          ? q.answer 
+          : [q.answer];
+      
       const selectedArray = Array.isArray(selected) ? selected : [selected];
 
       const isCorrect =
@@ -139,6 +158,7 @@ const GenerateQuiz = () => {
         return;
       }
 
+      console.log("Submitting quiz with data:", { quizId, answers, score: newScore });
       await axios.post(
         `${backendUrl}/api/quiz/submit-quiz`,
         { quizId, answers, score: newScore },
@@ -148,16 +168,27 @@ const GenerateQuiz = () => {
       toast.success("Quiz submitted successfully!");
     } catch (err) {
       console.error("❌ Submit Error:", err);
-      toast.error("Failed to submit quiz.");
+      console.error("Submit Error Details:", err.response?.data);
+      toast.error(err.response?.data?.message || "Failed to submit quiz.");
     }
   };
+
+  const LoadingSpinner = () => (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+      <div className="relative">
+        <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin"></div>
+        <div className="absolute top-0 left-0 w-16 h-16 border-4 border-blue-500 rounded-full animate-spin border-t-transparent"></div>
+      </div>
+      <p className="mt-4 text-xl font-semibold text-blue-600">Loading your quiz...</p>
+      <p className="mt-2 text-gray-600">This might take a few moments</p>
+    </div>
+  );
 
   if (loading) {
     return (
       <>
-        <div className="flex justify-center items-center h-screen text-xl font-semibold">
-          Loading Quiz...
-        </div>
+        <Navbar />
+        <LoadingSpinner />
         <Footer />
       </>
     );
@@ -166,69 +197,195 @@ const GenerateQuiz = () => {
   return (
     <>
       <Navbar />
-      <div className="flex min-h-screen bg-gray-100 p-4 gap-4 mt-18">
-        <div className="w-1/4 h-96 bg-white p-4 rounded-lg shadow-lg flex flex-col justify-between">
-          <div>
-            <h2 className="text-lg font-semibold mb-3 text-green-500">Attempted Questions</h2>
-            <div className="flex flex-wrap gap-2">
-              {questions.map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-8 h-8 flex items-center justify-center rounded-full shadow-lg text-black border font-semibold cursor-pointer 
-                    ${selectedAnswers[index] ? "bg-green-500" : markedForReview[index] ? "bg-blue-500" : "bg-white border-zinc-600"} 
-                    ${showAnswers && !selectedAnswers[index] ? "bg-red-500" : ""}`}
-                >
-                  {index + 1}
+      <div className="min-h-screen bg-gray-50 mt-20">
+        <div className="w-full px-4">
+          <div className="flex">
+            {/* Left Side - Navigation Panel */}
+            <div className="w-1/4 bg-white rounded-xl shadow-lg p-6 h-[calc(100vh-12rem)] sticky top-24">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Quiz Progress</h3>
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Questions Answered: {Object.keys(selectedAnswers).length}</span>
+                  <span>Marked for Review: {markedForReview.size}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-          <div className="mt-4 text-sm">
-            <p>Marked for Review: {Object.keys(markedForReview).length}</p>
-            {showAnswers && (
-              <p className="mt-2">Correct: {score} | Incorrect: {questions.length - score}</p>
-            )}
-          </div>
-        </div>
+              </div>
 
-        <div className="w-3/4 bg-white p-6 rounded-lg shadow-lg max-h-[70vh] flex flex-col justify-between">
-          <div>
-            {questions[currentQuestionIndex] && (
-              <p className="font-semibold">
-                {currentQuestionIndex + 1}. {questions[currentQuestionIndex].question}
-              </p>
-            )}
-            <div className="mt-2 space-y-2">
-              {questions[currentQuestionIndex]?.options.map((option, i) => (
-                <label key={i} className="flex items-center space-x-2 cursor-pointer w-full">
-                  <input
-                    type="checkbox"
-                    checked={selectedAnswers[currentQuestionIndex] === option}
-                    onChange={() => handleOptionChange(option)}
-                    className="cursor-pointer"
-                    disabled={showAnswers}
-                  />
-                  <span className="cursor-pointer" onClick={() => handleOptionChange(option)}>
-                    {String.fromCharCode(97 + i)}) {option}
-                  </span>
-                </label>
-              ))}
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                  {questions.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentQuestionIndex(index)}
+                      className={`p-3 rounded-lg text-center transition-all duration-200 ${
+                        currentQuestionIndex === index
+                          ? 'bg-blue-600 text-white shadow-md scale-105'
+                          : markedForReview.has(index)
+                          ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
+                          : selectedAnswers[index]
+                          ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                          : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                      }`}
+                    >
+                      {index + 1}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-6 space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-blue-600 rounded"></div>
+                    <span className="text-sm text-gray-600">Current Question</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-yellow-100 rounded"></div>
+                    <span className="text-sm text-gray-600">Marked for Review</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-green-100 rounded"></div>
+                    <span className="text-sm text-gray-600">Answered</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className="w-4 h-4 bg-gray-100 rounded"></div>
+                    <span className="text-sm text-gray-600">Not Answered</span>
+                  </div>
+                </div>
+
+                {showAnswers && (
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 className="font-semibold text-blue-800 mb-2">Quiz Results</h4>
+                    <p className="text-sm text-blue-600">
+                      Score: {score} / {questions.length}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-            {showAnswers && (
-              <p className="mt-2 font-semibold text-green-600">
-                Answer: {questions[currentQuestionIndex]?.answer}
-              </p>
-            )}
-          </div>
-          <div className="flex flex-col gap-2 w-full mt-4">
-            <div className="flex justify-between w-full gap-2">
-              <button onClick={handlePreviousQuestion} disabled={currentQuestionIndex === 0} className="py-2 px-4 bg-gray-500 w-full cursor-pointer text-white rounded-md">Previous</button>
-              <button onClick={handleClearSelection} className="py-2 w-full cursor-pointer px-4 bg-yellow-500 text-white rounded-md">Clear Selection</button>
-              <button onClick={handleNextQuestion} disabled={currentQuestionIndex === questions.length - 1} className="py-2 w-full cursor-pointer px-4 bg-green-500 text-white rounded-md">Save and Next</button>
-            </div>
-            <div className="flex flex-row gap-2">
-              <button onClick={handleMarkForReview} disabled={showAnswers} className="py-2 shadow-lg cursor-pointer px-4 bg-blue-500 text-white rounded-md w-full">Mark for Review</button>
-              <button onClick={handleSubmitQuiz} disabled={showAnswers} className="py-2 shadow-lg cursor-pointer px-4 bg-red-500 text-white rounded-md w-full">Submit</button>
+
+            {/* Right Side - Question Panel */}
+            <div className="w-3/4 pl-8">
+              <div className="bg-white rounded-xl shadow-lg p-8 h-[calc(100vh-8rem)] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <div className="flex justify-between items-center mb-8">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-gray-800">
+                      Question {currentQuestionIndex + 1} of {questions.length}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {markedForReview.has(currentQuestionIndex) ? 'Marked for Review' : 'Not Marked'}
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    {markedForReview.has(currentQuestionIndex) && (
+                      <span className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium">
+                        Marked for Review
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-8">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-6">
+                    {questions[currentQuestionIndex]?.question}
+                  </h3>
+                  <div className="space-y-4">
+                    {questions[currentQuestionIndex]?.options.map((option, idx) => (
+                      <label
+                        key={idx}
+                        className={`flex items-center p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                          selectedAnswers[currentQuestionIndex] === option
+                            ? 'border-blue-500 bg-blue-50 shadow-md'
+                            : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`question-${currentQuestionIndex}`}
+                          value={option}
+                          checked={selectedAnswers[currentQuestionIndex] === option}
+                          onChange={() => handleOptionChange(option)}
+                          className="hidden"
+                          disabled={showAnswers}
+                        />
+                        <div className={`w-6 h-6 border-2 rounded flex items-center justify-center mr-4 ${
+                          selectedAnswers[currentQuestionIndex] === option
+                            ? 'border-blue-500 bg-blue-500'
+                            : 'border-gray-300'
+                        }`}>
+                          {selectedAnswers[currentQuestionIndex] === option && (
+                            <div className="w-3 h-3 bg-white rounded-full"></div>
+                          )}
+                        </div>
+                        <span className="text-gray-700 text-lg">{option}</span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {showAnswers && (
+                    <div className="mt-6 p-4 bg-green-50 rounded-lg">
+                      <p className="text-green-800 font-medium">
+                        Correct Answer: {questions[currentQuestionIndex]?.answer}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center pt-6 border-t sticky bottom-0 bg-white">
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleMarkForReview}
+                      disabled={showAnswers}
+                      className={`px-4 py-2 rounded-lg flex items-center ${
+                        markedForReview.has(currentQuestionIndex)
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      } hover:bg-opacity-80 transition duration-200`}
+                    >
+                      <FaFlag className="mr-2" />
+                      {markedForReview.has(currentQuestionIndex) ? 'Unmark' : 'Mark for Review'}
+                    </button>
+                    <button
+                      onClick={handleClearSelection}
+                      disabled={showAnswers}
+                      className="px-4 py-2 rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 transition duration-200 flex items-center"
+                    >
+                      <FaTimes className="mr-2" />
+                      Clear Response
+                    </button>
+                  </div>
+
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handlePreviousQuestion}
+                      disabled={currentQuestionIndex === 0}
+                      className={`px-4 py-2 rounded-lg flex items-center ${
+                        currentQuestionIndex === 0
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                      } transition duration-200`}
+                    >
+                      <FaArrowLeft className="mr-2" />
+                      Previous
+                    </button>
+                    {currentQuestionIndex === questions.length - 1 ? (
+                      <button
+                        onClick={handleSubmitQuiz}
+                        disabled={showAnswers}
+                        className="px-6 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition duration-200 flex items-center"
+                      >
+                        <FaCheck className="mr-2" />
+                        Submit
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleNextQuestion}
+                        className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition duration-200 flex items-center"
+                      >
+                        Next
+                        <FaArrowRight className="ml-2" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -246,7 +246,7 @@ exports.submitQuiz = async (req, res) => {
     const quiz = await quizModel.findById(quizId);
     if (!quiz) {
       console.log(`Quiz not found with quizId: ${quizId}`);
-      return res.status(404).json({ message: "Quiz not found" });
+      return res.status(404).json({ success: false, error: true, message: "Quiz not found" });
     }
 
     const submissionData = answers.map((answer) => {
@@ -258,6 +258,7 @@ exports.submitQuiz = async (req, res) => {
 
       return {
         question: answer.question,
+        options: original?.options || [],
         selectedOptions: answer.selectedOptions,
         correctAnswers: [correct],
         isCorrect,
